@@ -1,4 +1,3 @@
-
 from commands2 import SubsystemBase
 from constants import ModuleConstants
 import math
@@ -11,6 +10,7 @@ class SwerveModule(SubsystemBase):
     """
     Swerve module level code
     """
+    module_id: int
 
     drive_motor: CANSparkMax
     steer_motor: CANSparkMax
@@ -26,8 +26,14 @@ class SwerveModule(SubsystemBase):
     drive_controller: SparkMaxPIDController
     steer_controller: SparkMaxPIDController
     
-    def __init__(self, drive_motor_id: int, steer_motor_id: int,
-                 steer_encoder_id: int, steer_offset: Rotation2d):
+    def __init__(self, 
+                 module_id: int,
+                 drive_motor_id: int, 
+                 steer_motor_id: int,
+                 steer_encoder_id: int, 
+                 steer_offset: Rotation2d):
+        self.module_id = module_id
+
         self.drive_motor = CANSparkMax(drive_motor_id, CANSparkMax.MotorType.kBrushless)
         self.steer_motor = CANSparkMax(steer_motor_id, CANSparkMax.MotorType.kBrushless)
         
