@@ -1,10 +1,13 @@
 
+from commands2 import SubsystemBase
 from constants import ModuleConstants
-from rev import CANSparkMax, SparkMaxRelativeEncoder, SparkMaxPIDController
+import math
+from rev import CANSparkMax, CANSparkMaxLowLevel, SparkMaxRelativeEncoder, SparkMaxPIDController
 from wpilib import DutyCycleEncoder, SmartDashboard
+from wpimath.kinematics import SwerveModuleState
 from wpimath.geometry import Rotation2d
 
-class SwerveModule:
+class SwerveModule(SubsystemBase):
     """
     Swerve module level code
     """
@@ -69,23 +72,59 @@ class SwerveModule:
 
         self.syncEncoders()
         
-        steer_id = self.steer_motor.getDeviceId()
+        self.steer_id = self.steer_motor.getDeviceId()
         abs_deg = self.getAbsolutePosition().getDegrees()
         rel_deg = self.getRelativePosition().getDegrees()
 
-        SmartDashboard.putNumber(f"Initial absolute position: {steer_id}", abs_deg)
-        SmartDashboard.putNumber(f"Initial relative position: {steer_id}", rel_deg)
+        SmartDashboard.putNumber(f"Initial absolute position: {self.steer_id}", abs_deg)
+        SmartDashboard.putNumber(f"Initial relative position: {self.steer_id}", rel_deg)
         
-    def getAbsolutePosition(self):
+    def getAbsolutePosition(self) -> Rotation2d:
         abs_pos = Rotation2d.fromDegrees(-self.throughbore_encoder.getAbsolutePosition() * 360.0)
         return abs_pos.minus(self.absolute_offset)
 
-    def getRelativePosition(self):
+    def getRelativePosition(self) -> Rotation2d:
         return Rotation2d.fromDegrees(self.steer_encoder.getPosition()).minus(self.relative_offset)
     
-    def syncEncoders(self):
-        deg = self.steer_encoder.getPosition() - self.getAbsolutePosition().getDegrees()
+    def syncEncoders(self) -> None:
+        deg = self.steer_encoder.getPosition() - self.getAbsolutePosition().degrees
         self.relative_offset = Rotation2d.fromDegrees(deg)
         
+    def getState(self) -> SwerveModuleState:
+        return SwerveModuleState(speed = self.drive_encoder.getVelocity(), angle = self.getRelativePosition())
+    
+    # Units: meters
+    def getDriveDistance(self) -> float: 
+        return self.drive_encoder.getPosition()
+
+    def resetDistance(self) -> None:
+        self.drive_encoder.setPosition(0.0)
+        
+    def setDesiredState(self, state: SwerveModuleState) -> None:
+        currentAngle = self.getRelativePosition().degrees
+        delta = self.deltaAdjustedAngle(state.angle.degrees, currentAngle)
+        driveOutput = state.speed
+
+        if math.abs(delta) > 90:
+            driveOutput *= -1
+            delta -= math.copysign(180, delta)
+
+        adjustedAngle = delta + currentAngle
+
+        SmartDashboard.putNumber(f"Commanded Velocity: {self.steer_id}", driveOutput)
+        SmartDashboard.putNumber(f"Commanded position: {self.steer_id}", adjustedAngle)
+
+        self.steer_controller.setReference(adjustedAngle + self.relative_offset.degrees, CANSparkMaxLowLevel.ControlType.kPosition)
+        self.drive_controller.setReference(driveOutput, CANSparkMaxLowLevel.ControlType.kVelocity)
+
+    # Compute motor angular setpoint from desired and current angles.
+    def deltaAdjustedAngle(self, target_angle: float, current_angle: float) -> float:
+        return ((target_angle - current_angle + 180) % 360 + 360) % 360 - 180
+        
+    def periodic(self) -> None:
+        SmartDashboard.putNumber(f"Drive velocity: {self.steer_id}", self.getState().speed)
+        SmartDashboard.putNumber(f"Relative position: {self.steer_id}", self.getRelativePosition().degrees)
+        SmartDashboard.putNumber(f"Absolute position: {self.steer_id}", self.getAbsolutePosition().degrees)
+        SmartDashboard.putNumber(f"Drive position: {self.steer_id}", self.getDriveDistance())
         
         
