@@ -1,5 +1,7 @@
 import math
 
+from wpimath.geometry import Rotation2d
+
 class ElectricalConstants:
     """
     A list of electrical constants for the robot
@@ -8,7 +10,7 @@ class ElectricalConstants:
     #  --------------- [fl, fr, rl, rr]
     kDriveMotorPorts = [28, 26, 10, 12]
     kSteerMotorPorts = [29, 27, 11, 13]
-    kAbsEncoderPorts = [43, 33, 45, 31]
+    kAbsEncoderPorts = [0, 1, 2, 3]
 
     kPigeonPort = 2
 
