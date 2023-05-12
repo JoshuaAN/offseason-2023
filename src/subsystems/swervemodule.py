@@ -33,7 +33,8 @@ class SwerveModule(SubsystemBase):
                  module_id: int,
                  drive_motor_id: int, 
                  steer_motor_id: int,
-                 steer_encoder_id: int):
+                 steer_encoder_id: int,
+                 absolute_offset: Rotation2d):
         self.module_id = module_id
 
         self.drive_motor = CANSparkMax(drive_motor_id, CANSparkMax.MotorType.kBrushless)
@@ -76,28 +77,31 @@ class SwerveModule(SubsystemBase):
 
         self.throughbore_encoder = DutyCycleEncoder(steer_encoder_id)
 
-        self.syncEncoders()
+        self.absolute_offset = absolute_offset
+        self.relative_offset = Rotation2d()
+
+        self.sync_encoders()
         
         self.steer_id = self.steer_motor.getDeviceId()
-        abs_deg = self.getAbsolutePosition().getDegrees()
-        rel_deg = self.getRelativePosition().getDegrees()
+        abs_deg = self.get_absolute_position().getDegrees()
+        rel_deg = self.get_relative_position().getDegrees()
 
         SmartDashboard.putNumber(f"Initial absolute position: {self.steer_id}", abs_deg)
         SmartDashboard.putNumber(f"Initial relative position: {self.steer_id}", rel_deg)
-        
+
     def get_absolute_position(self) -> Rotation2d:
         abs_pos = Rotation2d.fromDegrees(-self.throughbore_encoder.getAbsolutePosition() * 360.0)
-        return abs_pos.minus(self.absolute_offset)
+        return abs_pos - self.absolute_offset
 
     def get_relative_position(self) -> Rotation2d:
-        return Rotation2d.fromDegrees(self.steer_encoder.getPosition()).minus(self.relative_offset)
+        return Rotation2d.fromDegrees(self.steer_encoder.getPosition()) - self.relative_offset
     
     def sync_encoders(self) -> None:
-        deg = self.steer_encoder.getPosition() - self.getAbsolutePosition().degrees
+        deg = self.steer_encoder.getPosition() - self.get_absolute_position().degrees
         self.relative_offset = Rotation2d.fromDegrees(deg)
         
     def get_state(self) -> SwerveModuleState:
-        return SwerveModuleState(speed = self.drive_encoder.getVelocity(), angle = self.getRelativePosition())
+        return SwerveModuleState(speed = self.drive_encoder.getVelocity(), angle = self.get_relative_position())
     
     # Units: meters
     def get_drive_distance(self) -> float: 
@@ -107,7 +111,7 @@ class SwerveModule(SubsystemBase):
         self.drive_encoder.setPosition(0.0)
         
     def set_desired_state(self, state: SwerveModuleState) -> None:
-        currentAngle = self.getRelativePosition().degrees
+        currentAngle = self.get_relative_position().degrees
         delta = self.deltaAdjustedAngle(state.angle.degrees, currentAngle)
         driveOutput = state.speed
 
@@ -129,8 +133,8 @@ class SwerveModule(SubsystemBase):
         
     def periodic(self) -> None:
         SmartDashboard.putNumber(f"Drive velocity: {self.steer_id}", self.getState().speed)
-        SmartDashboard.putNumber(f"Relative position: {self.steer_id}", self.getRelativePosition().degrees)
-        SmartDashboard.putNumber(f"Absolute position: {self.steer_id}", self.getAbsolutePosition().degrees)
+        SmartDashboard.putNumber(f"Relative position: {self.steer_id}", self.get_relative_position().degrees)
+        SmartDashboard.putNumber(f"Absolute position: {self.steer_id}", self.get_absolute_position().degrees)
         SmartDashboard.putNumber(f"Drive position: {self.steer_id}", self.getDriveDistance())
         
         
